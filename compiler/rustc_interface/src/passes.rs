@@ -724,7 +724,7 @@ pub static DEFAULT_QUERY_PROVIDERS: LazyLock<Providers> = LazyLock::new(|| {
 });
 
 pub(crate) fn create_global_ctxt<'tcx>(
-    compiler: &'tcx Compiler,
+    compiler: &'tcx Compiler<'_>,
     mut krate: rustc_ast::Crate,
     gcx_cell: &'tcx OnceLock<GlobalCtxt<'tcx>>,
     arena: &'tcx WorkerLocal<Arena<'tcx>>,

@@ -66,8 +66,8 @@ impl<'a, 'tcx> QueryResult<'a, &'tcx GlobalCtxt<'tcx>> {
     }
 }
 
-pub struct Queries<'tcx> {
-    compiler: &'tcx Compiler,
+pub struct Queries<'a, 'tcx> {
+    compiler: &'tcx Compiler<'a>,
     gcx_cell: OnceLock<GlobalCtxt<'tcx>>,
 
     arena: WorkerLocal<Arena<'tcx>>,
@@ -78,8 +78,8 @@ pub struct Queries<'tcx> {
     gcx: Query<&'tcx GlobalCtxt<'tcx>>,
 }
 
-impl<'tcx> Queries<'tcx> {
-    pub fn new(compiler: &'tcx Compiler) -> Queries<'tcx> {
+impl<'a, 'tcx> Queries<'a, 'tcx> {
+    pub fn new(compiler: &'tcx Compiler<'a>) -> Queries<'a, 'tcx> {
         Queries {
             compiler,
             gcx_cell: OnceLock::new(),
@@ -199,10 +199,10 @@ impl Linker {
     }
 }
 
-impl Compiler {
+impl<'a> Compiler<'a> {
     pub fn enter<F, T>(&self, f: F) -> T
     where
-        F: for<'tcx> FnOnce(&'tcx Queries<'tcx>) -> T,
+        F: for<'tcx> FnOnce(&'tcx Queries<'a, 'tcx>) -> T,
     {
         // Must declare `_timer` first so that it is dropped after `queries`.
         let _timer;
