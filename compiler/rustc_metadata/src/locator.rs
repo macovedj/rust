@@ -581,11 +581,6 @@ impl<'a> CrateLocator<'a> {
             ) {
                 Ok(blob) => {
                     if let Some(h) = self.crate_matches(&blob, &lib) {
-                        if blob.get_header().is_reference {
-                            if slot.is_none() {
-                                todo!("return error");
-                            }
-                        }
                         (h, blob)
                     } else {
                         info!("metadata mismatch");
@@ -660,7 +655,12 @@ impl<'a> CrateLocator<'a> {
                     continue;
                 }
             }
-            *slot = Some((hash, metadata, lib.clone()));
+
+            if !metadata.get_header().is_reference {
+                // FIXME nicer error when only an rlib or dylib with is_reference is found
+                // and no .rmeta?
+                *slot = Some((hash, metadata, lib.clone()));
+            }
             ret = Some((lib, kind));
         }
 
@@ -751,6 +751,7 @@ impl<'a> CrateLocator<'a> {
                 let dll_prefix = self.target.dll_prefix.as_ref();
                 let dll_suffix = self.target.dll_suffix.as_ref();
                 if file.starts_with(dll_prefix) && file.ends_with(dll_suffix) {
+                    rmetas.insert(loc_canon.with_extension("rmeta"), PathKind::ExternFlag);
                     return Some(dylibs);
                 }
                 None
