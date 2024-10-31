@@ -385,37 +385,29 @@ fn run_compiler(
             return early_exit();
         }
 
-        let linker = compiler.enter(|queries| {
-            let early_exit = || {
-                sess.dcx().abort_if_errors();
-                None
-            };
-
+        let linker = {
             // Parse the crate root source code (doesn't parse submodules yet)
             // Everything else is parsed during macro expansion.
-            let krate = queries.parse();
+            let krate = passes::parse(&compiler.sess);
 
             // If pretty printing is requested: Figure out the representation, print it and exit
             if let Some(pp_mode) = sess.opts.pretty {
                 if pp_mode.needs_ast_map() {
-                    let krate = queries.parse().steal();
-
                     create_and_enter_global_ctxt(&compiler, krate, |tcx| {
                         tcx.ensure().early_lint_checks(());
                         pretty::print(sess, pp_mode, pretty::PrintExtra::NeedsAstMap { tcx });
                         passes::write_dep_info(tcx);
                     });
                 } else {
-                    let krate = queries.parse();
                     pretty::print(sess, pp_mode, pretty::PrintExtra::AfterParsing {
-                        krate: &*krate.borrow(),
+                        krate: &krate,
                     });
                 }
                 trace!("finished pretty-printing");
                 return early_exit();
             }
 
-            if callbacks.after_crate_root_parsing(compiler, &*krate.borrow()) == Compilation::Stop {
+            if callbacks.after_crate_root_parsing(compiler, &krate) == Compilation::Stop {
                 return early_exit();
             }
 
@@ -423,9 +415,12 @@ fn run_compiler(
                 return early_exit();
             }
 
-            let krate = queries.parse().steal();
-
             create_and_enter_global_ctxt(&compiler, krate, |tcx| {
+                let early_exit = || {
+                    sess.dcx().abort_if_errors();
+                    None
+                };
+
                 // Make sure name resolution and macro expansion is run.
                 let _ = tcx.resolver_for_lowering();
 
@@ -457,7 +452,7 @@ fn run_compiler(
 
                 Some(Linker::codegen_and_build_linker(tcx, &*compiler.codegen_backend))
             })
-        });
+        };
 
         // Linking is done outside the `compiler.enter()` so that the
         // `GlobalCtxt` within `Queries` can be freed as early as possible.
