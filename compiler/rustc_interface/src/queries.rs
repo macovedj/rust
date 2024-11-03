@@ -8,7 +8,7 @@ use rustc_hir::def_id::LOCAL_CRATE;
 use rustc_middle::dep_graph::DepGraph;
 use rustc_middle::ty::TyCtxt;
 use rustc_session::Session;
-use rustc_session::config::{self, OutputFilenames, OutputType};
+use rustc_session::config::{self, OutputFilenames};
 
 use crate::errors::FailedWritingFile;
 use crate::passes;
@@ -27,18 +27,6 @@ impl Linker {
         codegen_backend: &dyn CodegenBackend,
     ) -> Linker {
         let ongoing_codegen = passes::start_codegen(codegen_backend, tcx);
-
-        // This must run after monomorphization so that all generic types
-        // have been instantiated.
-        if tcx.sess.opts.unstable_opts.print_type_sizes {
-            tcx.sess.code_stats.print_type_sizes();
-        }
-
-        if tcx.sess.opts.unstable_opts.print_vtable_sizes {
-            let crate_name = tcx.crate_name(LOCAL_CRATE);
-
-            tcx.sess.code_stats.print_vtable_sizes(crate_name);
-        }
 
         Linker {
             dep_graph: tcx.dep_graph.clone(),
@@ -72,12 +60,7 @@ impl Linker {
         // any more, we can finalize it (which involves renaming it)
         rustc_incremental::finalize_session_directory(sess, self.crate_hash);
 
-        if !sess
-            .opts
-            .output_types
-            .keys()
-            .any(|&i| i == OutputType::Exe || i == OutputType::Metadata)
-        {
+        if !sess.opts.output_types.should_link() {
             return;
         }
 

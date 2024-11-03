@@ -1127,24 +1127,36 @@ pub(crate) fn start_codegen<'tcx>(
 
     info!("Pre-codegen\n{:?}", tcx.debug_stats());
 
-    let (metadata, need_metadata_module) = rustc_metadata::fs::encode_and_write_metadata(tcx);
-
-    let codegen = tcx.sess.time("codegen_crate", move || {
-        codegen_backend.codegen_crate(tcx, metadata, need_metadata_module)
-    });
-
     // Don't run this test assertions when not doing codegen. Compiletest tries to build
     // build-fail tests in check mode first and expects it to not give an error in that case.
     if tcx.sess.opts.output_types.should_codegen() {
         rustc_symbol_mangling::test::report_symbol_names(tcx);
     }
 
-    info!("Post-codegen\n{:?}", tcx.debug_stats());
+    let (metadata, need_metadata_module) = rustc_metadata::fs::encode_and_write_metadata(tcx);
 
     if tcx.sess.opts.output_types.contains_key(&OutputType::Mir) {
         if let Err(error) = rustc_mir_transform::dump_mir::emit_mir(tcx) {
             tcx.dcx().emit_fatal(errors::CantEmitMIR { error });
         }
+    }
+
+    let codegen = tcx.sess.time("codegen_crate", move || {
+        codegen_backend.codegen_crate(tcx, metadata, need_metadata_module)
+    });
+
+    info!("Post-codegen\n{:?}", tcx.debug_stats());
+
+    // This must run after monomorphization so that all generic types
+    // have been instantiated.
+    if tcx.sess.opts.unstable_opts.print_type_sizes {
+        tcx.sess.code_stats.print_type_sizes();
+    }
+
+    if tcx.sess.opts.unstable_opts.print_vtable_sizes {
+        let crate_name = tcx.crate_name(LOCAL_CRATE);
+
+        tcx.sess.code_stats.print_vtable_sizes(crate_name);
     }
 
     codegen
